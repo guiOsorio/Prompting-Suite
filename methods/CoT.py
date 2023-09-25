@@ -1,3 +1,5 @@
+# https://arxiv.org/pdf/2201.11903.pdf
+
 import random
 
 zeroshot_cot = "Answer the following question in a step-by-step manner. Q: {question}. A: "
@@ -270,7 +272,7 @@ def create_cot_prompt(data=cot_examples, few_shot=False, subject=None, n=2):
     # Few-shot case
     if few_shot:
         prompt_beg = "Here are some examples of questions answered in a step-by-step manner.\n"
-        prompt_end = "\nAnswer the following question in a step-by-step manner, where the last step outputs the final answer. Q: {question}. A: "
+        prompt_end = "\nAnswer the following question in a step-by-step manner, where the last step outputs the final answer. Clearly state what the final answer is."
 
         # Specific subject is selected case
         if subject != None:
