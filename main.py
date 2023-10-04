@@ -4,18 +4,23 @@ import dotenv
 
 from methods.CoT import create_cot_prompt, possible_subjects, cot_examples
 from methods.self_consistency import perform_sc
+from methods.auto_CoT import create_autocot_prompt, clustering_methods
 
 dotenv.load_dotenv()
 openai.api_key = os.environ['OPENAI_API_KEY']
 
 # Define LLM model and system prompt
 model = 'gpt-3.5-turbo'
-possible_methods = ['cot', 'cot+sc']
+possible_methods = ['cot', 'cot+sc', 'autocot']
 
-def create_system_prompt(cot_few_shot=None, cot_subject=None, cot_n=None, method=None):
+def create_system_prompt(cot_few_shot=None, cot_subject=None, cot_n=None, method=None, clustering_method='kmeans'):
+    if method:
+        method = method.lower()
     if method in possible_methods:
-        if method.lower() == 'cot':
+        if method == 'cot':
             system_prompt = create_cot_prompt(few_shot=cot_few_shot, subject=cot_subject, n=cot_n)
+        elif method == 'autocot':
+            system_prompt = create_autocot_prompt(clustering_method=clustering_method)
     elif method == None:
         system_prompt = 'You are a helpful assistant.'
     else:
@@ -32,7 +37,7 @@ def add_message(messages, role, message):
     return messages
 
 # Start conversation
-def chat(messages, cot=False, sc=False, sc_subject=None, sc_n=None, sc_n_samples=None):
+def chat(messages, multi_turn=False, sc=False, sc_subject=None, sc_n=None, sc_n_samples=None):
     user_input = input("Input (type 'exit' to end the conversation): ")
 
     # Terminate chat if input is 'exit'
@@ -48,8 +53,8 @@ def chat(messages, cot=False, sc=False, sc_subject=None, sc_n=None, sc_n_samples
             print(answer)
             return
         
-        # Chain-of-thought
-        elif cot:
+        # Multi-turn
+        elif multi_turn:
             # Call LLM
             response = openai.ChatCompletion.create(
                 model=model,
@@ -63,7 +68,7 @@ def chat(messages, cot=False, sc=False, sc_subject=None, sc_n=None, sc_n_samples
 
             print(answer)
 
-            chat(new_messages, cot=cot)
+            chat(new_messages, multi_turn=True)
 
 
 # Terminal interface for user to choose the prompting technique to be used
@@ -76,7 +81,7 @@ if selected_method not in range(0, len(possible_methods)):
 # CoT
 if possible_methods[selected_method] == 'cot':
     init_msg = create_system_prompt(cot_few_shot=True, cot_subject=None, cot_n=2, method='cot')
-    chat(messages=init_msg, cot=True)
+    chat(messages=init_msg, multi_turn=True)
 # CoT + SC - not a chatbot, made for one input/output pair only
 elif possible_methods[selected_method] == 'cot+sc':
     # Select subject and validate it
@@ -100,7 +105,14 @@ elif possible_methods[selected_method] == 'cot+sc':
     sc_n_samples = int(input("Select the number of samples to be used in sc: "))
     init_msg = create_system_prompt()
     chat(messages=init_msg, sc=True, sc_subject=sc_subject, sc_n=sc_n, sc_n_samples=sc_n_samples)
-# Auto-CoT
-
-
-# Which is a faster way to get home? Option 1: Take an 10 minutes bus, then an 40 minute bus, and finally a 10 minute train. Option 2: Take a 90 minutes train, then a 45 minute bike ride, and finally a 10 minute bus.
+# Auto-CoT - starts a chat with a system prompt that has a few-shot prompt with one example from each cluster in the CoT data. Valid clustering methods are ['kmeans', 'agg', 'hdbscan']
+elif possible_methods[selected_method] == 'autocot':
+    # Select clustering method and validate it
+    clustering_method = input(f"Select a subject from the following list {[clustering for clustering in clustering_methods]}: ")
+    if clustering_method == None:
+        pass
+    elif clustering_method not in clustering_methods:
+        raise ValueError("Not a valid subject")
+    
+    init_msg = create_system_prompt(method='autocot', clustering_method=clustering_method)
+    chat(messages=init_msg, multi_turn=True)
